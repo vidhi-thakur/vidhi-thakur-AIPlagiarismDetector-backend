@@ -1,16 +1,21 @@
 const express = require("express");
+const { detectPlagiarism } = require("../plagiarism_controller");
+const multer = require('multer');
+
 const app = express();
+
+const upload = multer({ dest: 'uploadFiles/' });
 
 app.use((req, res, next) => {
     res.header('Access-Control-Allow-Origin', '*');
-    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+    res.header('Access-Control-Allow-Headers', '*');
     res.header('Access-Control-Allow-Methods',
    'GET, POST, PUT, DELETE');
     next();
   });
 
 app.get("/", (req, res) => res.send("Express on Vercel"));
-app.get("/testing", (req, res) => res.send("Testing Express on Vercel"));
+app.post("/detect-plagiarism", upload.fields([{name: 'fileToCheck'}, {name: 'fileToCompare'}]), detectPlagiarism);
 
 app.listen(5000, () => console.log("Server ready on port 5000."));
 
