@@ -1,6 +1,5 @@
 const fs = require('fs');
 const pdf = require('pdf-parse');
-const WordExtractor = require("word-extractor");
 
 async function extractTextFromPDF(filepath) {
     const databuffer = fs.readFileSync(filepath);
@@ -8,23 +7,11 @@ async function extractTextFromPDF(filepath) {
     return data.text;
 }
 
-async function extractTextFromWord(filepath) {
-    const extractor = new WordExtractor();
-    const extracted = extractor.extract(filepath);
-    let text = extracted.then(function (doc) {
-        return doc.getBody();
-    });
-    return text;
-}
-
 async function extractText(file) {
     if (file.mimetype.split("/")[1] === 'pdf') {
         const text = await extractTextFromPDF(file.path);
         return text;
-    } else {
-        const text = extractTextFromWord(file.path)
-        return text;
-    }
+    } else return null;
 }
 
 function jaccardSimilarity(string1, string2) {
@@ -33,25 +20,31 @@ function jaccardSimilarity(string1, string2) {
     const intersection = new Set([...set1].filter(x => set2.has(x)));
     const union = new Set([...set1, ...set2]);
 
-    return (intersection.size / union.size) * 100;
+    return {
+        score: (intersection.size / union.size) * 100,
+        similar_sections: [...intersection]
+    };
 }
 
 export const detectPlagiarism = async (req, res) => {
     try {
-
         const { fileToCheck, fileToCompare } = req.files;
         if (!fileToCheck) {
-            res.status(500).json({ error: true, error_message: "Attach file to check." });
+            res.send({ error: true, error_message: "Attach file to check." });
         }
         if (!fileToCompare) {
-            res.status(500).json({ error: true, error_message: "Attach file to compare." });
+            res.send({ error: true, error_message: "Attach file to compare." });
         }
         const checktext = await extractText(fileToCheck[0]);
         const comparetext = await extractText(fileToCompare[0]);
 
-        const similarity = jaccardSimilarity(checktext, comparetext);
-        res.send({ similarity_percent: similarity });
+        if (checktext  === null || comparetext === null) {
+            res.send({ error: true, error_message: "something went wrong" });
+        }
+
+        const { similar_sections, score } = jaccardSimilarity(checktext, comparetext);
+        res.send({ similarity_percent: score, similar_sections });
     } catch (error) {
-        res.status(500).json({ error: true, error_message: "Something went wrong!" });
+        res.send({ error: true, error_message: "Something went wrong!" });
     }
 }
